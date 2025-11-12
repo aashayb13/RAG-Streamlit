@@ -1,0 +1,23 @@
+# Core Dependencies
+streamlit==1.31.0
+python-dotenv==1.0.0
+
+# Web Scraping
+beautifulsoup4==4.12.3
+requests==2.31.0
+urllib3==2.2.0
+lxml==5.1.0
+
+# Vector Database
+chromadb==0.4.22
+sentence-transformers==2.3.1
+
+# Data Processing
+pandas==2.2.0
+numpy==1.26.3
+
+# URL Processing
+validators==0.22.0
+
+# Logging
+colorlog==6.8.2

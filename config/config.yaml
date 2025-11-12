@@ -1,0 +1,27 @@
+# RAG System Configuration
+
+# Scraper Settings
+scraper:
+  max_depth: 3  # Maximum depth for subpage crawling
+  max_pages: 50  # Maximum number of pages to scrape per website
+  timeout: 10  # Request timeout in seconds
+  delay: 1  # Delay between requests in seconds (be polite!)
+  user_agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+
+# Database Settings
+database:
+  type: "chromadb"  # Options: "chromadb" or "sqlite"
+  chroma_path: "./data/chroma"
+  sqlite_path: "./data/scraped_data.db"
+  collection_name: "website_content"
+
+# Embedding Settings
+embedding:
+  model_name: "all-MiniLM-L6-v2"  # Sentence transformer model
+  chunk_size: 512  # Size of text chunks for embedding
+  chunk_overlap: 50  # Overlap between chunks
+
+# Logging
+logging:
+  level: "INFO"  # Options: DEBUG, INFO, WARNING, ERROR
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
