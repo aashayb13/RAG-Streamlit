@@ -312,6 +312,14 @@ Search:
 }
 ```
 
+**Important Note on Metadata:**
+ChromaDB only accepts simple types (str, int, float, bool) as metadata values. The database module automatically sanitizes metadata by:
+- Keeping simple types as-is
+- Converting lists and dictionaries to JSON strings
+- Skipping values that cannot be serialized
+
+For example, if the web scraper extracts a `headings` field as a list of dictionaries, it will be automatically converted to a JSON string before storage. This ensures compatibility with ChromaDB while preserving all metadata information.
+
 ### SQLite Schema
 
 ```sql
