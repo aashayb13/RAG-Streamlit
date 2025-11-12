@@ -186,6 +186,45 @@ class VectorDatabase:
             logger.error(f"Error adding documents: {str(e)}")
             return False
 
+    def _sanitize_metadata(self, metadata: Dict) -> Dict:
+        """
+        Sanitize metadata for ChromaDB by converting complex types to simple types.
+
+        ChromaDB only accepts str, int, float, and bool values in metadata.
+        This method converts or removes complex types like lists and dicts.
+
+        Args:
+            metadata (Dict): Original metadata dictionary
+
+        Returns:
+            Dict: Sanitized metadata with only simple types
+        """
+        sanitized = {}
+
+        for key, value in metadata.items():
+            if value is None:
+                continue
+            elif isinstance(value, (str, int, float, bool)):
+                # Simple types are fine
+                sanitized[key] = value
+            elif isinstance(value, (list, dict)):
+                # Convert complex types to JSON string
+                try:
+                    sanitized[key] = json.dumps(value)
+                except (TypeError, ValueError):
+                    # If can't serialize, skip this field
+                    logger.warning(f"Skipping metadata field '{key}' - cannot serialize")
+                    continue
+            else:
+                # Try to convert to string
+                try:
+                    sanitized[key] = str(value)
+                except:
+                    logger.warning(f"Skipping metadata field '{key}' - cannot convert to string")
+                    continue
+
+        return sanitized
+
     def _add_documents_chromadb(
         self,
         urls: List[str],
@@ -214,11 +253,14 @@ class VectorDatabase:
                     metadatas[i]['website_url'] = website_url
                 metadatas[i]['timestamp'] = datetime.now().isoformat()
 
+            # Sanitize metadata to remove complex types
+            sanitized_metadatas = [self._sanitize_metadata(meta) for meta in metadatas]
+
             # Add to collection
             self.collection.add(
                 ids=ids,
                 documents=documents,
-                metadatas=metadatas
+                metadatas=sanitized_metadatas
             )
 
             logger.info(f"Added {len(urls)} documents to ChromaDB")
