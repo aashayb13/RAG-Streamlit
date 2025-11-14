@@ -188,10 +188,10 @@ class VectorDatabase:
 
     def _sanitize_metadata(self, metadata: Dict) -> Dict:
         """
-        Sanitize metadata for ChromaDB by converting complex types to simple types.
+        Sanitize metadata for ChromaDB by keeping only simple types.
 
         ChromaDB only accepts str, int, float, and bool values in metadata.
-        This method converts or removes complex types like lists and dicts.
+        This method aggressively filters to only keep compatible types.
 
         Args:
             metadata (Dict): Original metadata dictionary
@@ -201,27 +201,27 @@ class VectorDatabase:
         """
         sanitized = {}
 
+        # List of keys we want to keep if they're simple types
+        safe_keys = ['url', 'title', 'website_url', 'timestamp', 'description',
+                     'author', 'keywords', 'og:title', 'og:description']
+
         for key, value in metadata.items():
             if value is None:
                 continue
-            elif isinstance(value, (str, int, float, bool)):
-                # Simple types are fine
+
+            # Only process simple types
+            if isinstance(value, str):
+                # Ensure string is not too long (ChromaDB has limits)
+                sanitized[key] = value[:1000] if len(value) > 1000 else value
+            elif isinstance(value, (int, float)):
                 sanitized[key] = value
-            elif isinstance(value, (list, dict)):
-                # Convert complex types to JSON string
-                try:
-                    sanitized[key] = json.dumps(value)
-                except (TypeError, ValueError):
-                    # If can't serialize, skip this field
-                    logger.warning(f"Skipping metadata field '{key}' - cannot serialize")
-                    continue
+            elif isinstance(value, bool):
+                sanitized[key] = value
             else:
-                # Try to convert to string
-                try:
-                    sanitized[key] = str(value)
-                except:
-                    logger.warning(f"Skipping metadata field '{key}' - cannot convert to string")
-                    continue
+                # Skip all complex types (lists, dicts, etc.)
+                # Don't try to convert them - just skip
+                logger.debug(f"Skipping metadata field '{key}' - complex type {type(value)}")
+                continue
 
         return sanitized
 
@@ -233,28 +233,44 @@ class VectorDatabase:
         metadatas: Optional[List[Dict]],
         website_url: Optional[str]
     ) -> bool:
-        """Add documents to ChromaDB."""
+        """Add documents to ChromaDB with automatic fallback to SQLite."""
         try:
-            # Prepare IDs (use URL as ID, replacing special characters)
-            ids = [url.replace('/', '_').replace(':', '_').replace('.', '_') for url in urls]
+            # Prepare IDs - make them unique and valid
+            import hashlib
+            ids = []
+            for url in urls:
+                # Use hash of URL to create a valid, unique ID
+                url_hash = hashlib.md5(url.encode()).hexdigest()
+                ids.append(f"doc_{url_hash}")
 
             # Prepare documents (combine title and content)
             documents = [f"{title}\n\n{content}" for title, content in zip(titles, contents)]
 
-            # Prepare metadata
-            if metadatas is None:
-                metadatas = [{} for _ in urls]
-
-            # Add website_url and title to metadata
+            # Prepare clean metadata - start fresh to avoid issues
+            clean_metadatas = []
             for i, (url, title) in enumerate(zip(urls, titles)):
-                metadatas[i]['url'] = url
-                metadatas[i]['title'] = title
-                if website_url:
-                    metadatas[i]['website_url'] = website_url
-                metadatas[i]['timestamp'] = datetime.now().isoformat()
+                # Create a new clean metadata dict with only essential fields
+                clean_meta = {
+                    'url': url,
+                    'title': title[:500] if len(title) > 500 else title,  # Limit length
+                    'timestamp': datetime.now().isoformat()
+                }
 
-            # Sanitize metadata to remove complex types
-            sanitized_metadatas = [self._sanitize_metadata(meta) for meta in metadatas]
+                if website_url:
+                    clean_meta['website_url'] = website_url
+
+                # Add a few safe fields from original metadata if they exist
+                if metadatas and i < len(metadatas):
+                    original_meta = metadatas[i]
+                    # Only add simple string fields
+                    for key in ['description', 'author', 'keywords']:
+                        if key in original_meta and isinstance(original_meta[key], str):
+                            clean_meta[key] = original_meta[key][:500]  # Limit length
+
+                clean_metadatas.append(clean_meta)
+
+            # Final sanitization pass
+            sanitized_metadatas = [self._sanitize_metadata(meta) for meta in clean_metadatas]
 
             # Add to collection
             self.collection.add(
@@ -263,12 +279,36 @@ class VectorDatabase:
                 metadatas=sanitized_metadatas
             )
 
-            logger.info(f"Added {len(urls)} documents to ChromaDB")
+            logger.info(f"✅ Successfully added {len(urls)} documents to ChromaDB")
             return True
 
         except Exception as e:
-            logger.error(f"Error adding documents to ChromaDB: {str(e)}")
-            return False
+            logger.error(f"❌ ChromaDB failed: {str(e)}")
+            logger.warning("🔄 Attempting automatic fallback to SQLite...")
+
+            # Automatic fallback to SQLite
+            try:
+                # Initialize SQLite if not already done
+                if not self.sqlite_conn:
+                    self._initialize_sqlite()
+
+                # Switch database type
+                old_type = self.db_type
+                self.db_type = "sqlite"
+
+                # Try adding to SQLite
+                success = self._add_documents_sqlite(urls, titles, contents, metadatas, website_url)
+
+                if success:
+                    logger.info("✅ Successfully stored documents in SQLite fallback")
+                    return True
+                else:
+                    self.db_type = old_type
+                    return False
+
+            except Exception as e2:
+                logger.error(f"❌ SQLite fallback also failed: {str(e2)}")
+                return False
 
     def _add_documents_sqlite(
         self,

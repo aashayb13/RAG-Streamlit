@@ -90,6 +90,8 @@ source venv/bin/activate
 pip install -r requirements.txt
 ```
 
+**💡 Quick Tip:** If you encounter ChromaDB issues, the system will automatically fallback to SQLite. Or you can switch to SQLite directly by editing `config/config.yaml` and changing `type: "chromadb"` to `type: "sqlite"` - SQLite works perfectly and requires no additional setup!
+
 This will install:
 - **streamlit**: Web application framework
 - **beautifulsoup4**: HTML parsing
@@ -301,35 +303,46 @@ normalized = validator.normalize_url("example.com")
 
 ## Troubleshooting
 
-### Common Issues
+**📘 For detailed troubleshooting, see [TROUBLESHOOTING.md](TROUBLESHOOTING.md)**
 
-#### 1. ChromaDB Installation Fails
-**Solution**: Install with SQLite fallback
-```bash
-pip install --no-deps chromadb
-# Or use SQLite by changing config.yaml
+### Quick Solutions
+
+#### ChromaDB Metadata Errors
+The system has **automatic fallback to SQLite** if ChromaDB fails. You don't need to do anything!
+
+Alternatively, switch to SQLite directly in `config/config.yaml`:
+```yaml
+database:
+  type: "sqlite"  # Change from "chromadb" to "sqlite"
 ```
 
-#### 2. Scraper Times Out
-**Solution**: Increase timeout in config.yaml
+#### Common Issues
+
+**1. ChromaDB Installation Fails**
+```bash
+# Use SQLite instead - it's more reliable
+# Edit config/config.yaml and set: type: "sqlite"
+```
+
+**2. Scraper Times Out**
 ```yaml
 scraper:
-  timeout: 30  # Increase from 10 to 30
+  timeout: 30  # Increase in config.yaml
 ```
 
-#### 3. Too Many Pages Scraped
-**Solution**: Reduce max_pages or max_depth
+**3. Too Many Pages Scraped**
 ```yaml
 scraper:
   max_depth: 2
   max_pages: 20
 ```
 
-#### 4. Memory Issues
-**Solution**:
+**4. Memory Issues**
+- Use SQLite instead of ChromaDB (lighter weight)
 - Reduce max_pages
-- Use SQLite instead of ChromaDB
 - Clear database regularly
+
+📘 **See [TROUBLESHOOTING.md](TROUBLESHOOTING.md) for complete solutions**
 
 ## Development
 

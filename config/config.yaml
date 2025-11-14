@@ -11,6 +11,8 @@ scraper:
 # Database Settings
 database:
   type: "chromadb"  # Options: "chromadb" or "sqlite"
+  # Note: If ChromaDB fails, system will automatically fallback to SQLite
+  # To use SQLite directly (recommended if having issues), change type to "sqlite"
   chroma_path: "./data/chroma"
   sqlite_path: "./data/scraped_data.db"
   collection_name: "website_content"
